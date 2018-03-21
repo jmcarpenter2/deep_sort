@@ -3,6 +3,7 @@ from __future__ import division, print_function, absolute_import
 
 import argparse
 import os
+import re
 
 import cv2
 import numpy as np
@@ -40,10 +41,15 @@ def gather_sequence_info(sequence_dir, detection_file):
         * max_frame_idx: Index of the last frame.
 
     """
-    image_dir = os.path.join(sequence_dir, "img1")
-    image_filenames = {
-        int(os.path.splitext(f)[0]): os.path.join(image_dir, f)
-        for f in os.listdir(image_dir)}
+    image_dir = os.path.join(sequence_dir, "img")
+    try:
+        image_filenames = {
+            int(os.path.splitext(f)[0]): os.path.join(image_dir, f)
+            for f in os.listdir(image_dir)}
+    except:
+        image_filenames = {
+            int(re.findall('[0-9]+', f)[-1]): os.path.join(image_dir, f)
+            for f in os.listdir(image_dir)}
     groundtruth_file = os.path.join(sequence_dir, "gt/gt.txt")
 
     detections = None
@@ -128,7 +134,7 @@ def create_detections(detection_mat, frame_idx, min_height=0):
 
 def run(sequence_dir, detection_file, output_file, min_confidence,
         nms_max_overlap, min_detection_height, max_cosine_distance,
-        nn_budget, display):
+        nn_budget, display, lam):
     """Run multi-target tracker on a particular sequence.
 
     Parameters
@@ -160,7 +166,7 @@ def run(sequence_dir, detection_file, output_file, min_confidence,
     seq_info = gather_sequence_info(sequence_dir, detection_file)
     metric = nn_matching.NearestNeighborDistanceMetric(
         "cosine", max_cosine_distance, nn_budget)
-    tracker = Tracker(metric)
+    tracker = Tracker(metric, lam=lam)
     results = []
 
     def frame_callback(vis, frame_idx):
@@ -245,7 +251,10 @@ def parse_args():
         "gallery. If None, no budget is enforced.", type=int, default=None)
     parser.add_argument(
         "--display", help="Show intermediate tracking results",
-        default=True, type=bool)
+        default=False, type=bool)
+    parser.add_argument(
+	"--lam", help="Proportional influence of kalman filter to appearance metrics on cost matrix",
+	 default=0.0, type=float)
     return parser.parse_args()
 
 
@@ -254,4 +263,4 @@ if __name__ == "__main__":
     run(
         args.sequence_dir, args.detection_file, args.output_file,
         args.min_confidence, args.nms_max_overlap, args.min_detection_height,
-        args.max_cosine_distance, args.nn_budget, args.display)
+        args.max_cosine_distance, args.nn_budget, args.display, args.lam)

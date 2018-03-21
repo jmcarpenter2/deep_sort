@@ -9,8 +9,8 @@ INFTY_COST = 1e+5
 
 
 def min_cost_matching(
-        distance_metric, max_distance, tracks, detections, track_indices=None,
-        detection_indices=None):
+        emb_dist_metric, emb_max_dist, kf_dist_metric, kf_max_dist, lam,
+        tracks, detections, track_indices=None, detection_indices=None):
     """Solve linear assignment problem.
 
     Parameters
@@ -51,10 +51,16 @@ def min_cost_matching(
 
     if len(detection_indices) == 0 or len(track_indices) == 0:
         return [], track_indices, detection_indices  # Nothing to match.
-
-    cost_matrix = distance_metric(
-        tracks, detections, track_indices, detection_indices)
-    cost_matrix[cost_matrix > max_distance] = max_distance + 1e-5
+    
+    c1 = emb_dist_metric(tracks, detections, track_indices, detection_indices)
+    c2 = kf_dist_metric(tracks, detections, track_indices, detection_indices)
+    b1 = c1 <= emb_max_dist
+    b2 = c2 <= kf_max_dist
+    c1[c1 > emb_max_dist] = emb_max_dist + 1e-5
+    c2[c2 > kf_max_dist] = kf_max_dist + 1e-5
+    
+    cost_matrix = ((1 - lam) * c1) + (lam * c2)
+    b = np.multiply(b1, b2)
     indices = linear_assignment(cost_matrix)
 
     matches, unmatched_tracks, unmatched_detections = [], [], []
@@ -67,17 +73,18 @@ def min_cost_matching(
     for row, col in indices:
         track_idx = track_indices[row]
         detection_idx = detection_indices[col]
-        if cost_matrix[row, col] > max_distance:
+        if b[row, col]:
+            matches.append((track_idx, detection_idx))
+        else:
             unmatched_tracks.append(track_idx)
             unmatched_detections.append(detection_idx)
-        else:
-            matches.append((track_idx, detection_idx))
+            
     return matches, unmatched_tracks, unmatched_detections
 
 
 def matching_cascade(
-        distance_metric, max_distance, cascade_depth, tracks, detections,
-        track_indices=None, detection_indices=None):
+        emb_dist_metric, emb_max_dist, kf_dist_metric, kf_max_dist, lam, cascade_depth,
+    tracks, detections, track_indices=None, detection_indices=None):
     """Run matching cascade.
 
     Parameters
@@ -134,8 +141,8 @@ def matching_cascade(
 
         matches_l, _, unmatched_detections = \
             min_cost_matching(
-                distance_metric, max_distance, tracks, detections,
-                track_indices_l, unmatched_detections)
+                emb_dist_metric, emb_max_dist, kf_dist_metric, kf_max_dist, 
+                lam, tracks, detections, track_indices_l, unmatched_detections)
         matches += matches_l
     unmatched_tracks = list(set(track_indices) - set(k for k, _ in matches))
     return matches, unmatched_tracks, unmatched_detections
@@ -187,4 +194,48 @@ def gate_cost_matrix(
         gating_distance = kf.gating_distance(
             track.mean, track.covariance, measurements, only_position)
         cost_matrix[row, gating_distance > gating_threshold] = gated_cost
+    return cost_matrix
+
+
+def kf_cost_matrix(distance_metric, max_distance, tracks, detections, 
+	track_indices=None,detection_indices=None):
+    """Calculate Kalman Filtering cost matrix
+
+    Parameters
+    ----------
+    distance_metric : Callable[List[Track], List[Detection], List[int], List[int]) -> ndarray
+        The distance metric is given a list of tracks and detections as well as
+        a list of N track indices and M detection indices. The metric should
+        return the NxM dimensional cost matrix, where element (i, j) is the
+        association cost between the i-th track in the given track indices and
+        the j-th detection in the given detection_indices.
+    max_distance : float
+        Gating threshold. Associations with cost larger than this value are
+        disregarded.
+    tracks : List[track.Track]
+        A list of predicted tracks at the current time step.
+    detections : List[detection.Detection]
+        A list of detections at the current time step.
+    track_indices : List[int]
+        List of track indices that maps rows in `cost_matrix` to tracks in
+        `tracks` (see description above).
+    detection_indices : List[int]
+        List of detection indices that maps columns in `cost_matrix` to
+        detections in `detections` (see description above).
+
+    Returns
+    -------
+	N x M cost matrix
+    """
+    if track_indices is None:
+        track_indices = np.arange(len(tracks))
+    if detection_indices is None:
+        detection_indices = np.arange(len(detections))
+
+    if len(detection_indices) == 0 or len(track_indices) == 0:
+        return [], track_indices, detection_indices  # Nothing to match.
+
+    cost_matrix = distance_metric(
+        tracks, detections, track_indices, detection_indices)
+    cost_matrix[cost_matrix > max_distance] = max_distance + 1e-5
     return cost_matrix

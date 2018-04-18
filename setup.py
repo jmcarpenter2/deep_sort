@@ -12,7 +12,7 @@ setup(
         'numpy',
         'scipy',
         'sklearn',
-        'cv2'
+        'opencv'
   ],
   classifiers = [],
 )

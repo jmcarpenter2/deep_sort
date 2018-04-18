@@ -51,14 +51,14 @@ def min_cost_matching(
 
     if len(detection_indices) == 0 or len(track_indices) == 0:
         return [], track_indices, detection_indices  # Nothing to match.
-    
+
     c1 = emb_dist_metric(tracks, detections, track_indices, detection_indices)
     c2 = kf_dist_metric(tracks, detections, track_indices, detection_indices)
     b1 = c1 <= emb_max_dist
     b2 = c2 <= kf_max_dist
     c1[c1 > emb_max_dist] = emb_max_dist + 1e-5
     c2[c2 > kf_max_dist] = kf_max_dist + 1e-5
-    
+
     cost_matrix = ((1 - lam) * c1) + (lam * c2)
     b = np.multiply(b1, b2)
     indices = linear_assignment(cost_matrix)
@@ -78,13 +78,13 @@ def min_cost_matching(
         else:
             unmatched_tracks.append(track_idx)
             unmatched_detections.append(detection_idx)
-            
+
     return matches, unmatched_tracks, unmatched_detections
 
 
 def matching_cascade(
-        emb_dist_metric, emb_max_dist, kf_dist_metric, kf_max_dist, lam, cascade_depth,
-    tracks, detections, track_indices=None, detection_indices=None):
+    emb_dist_metric, emb_max_dist, kf_dist_metric, kf_max_dist, lam, cascade_depth,
+        tracks, detections, track_indices=None, detection_indices=None):
     """Run matching cascade.
 
     Parameters
@@ -136,12 +136,13 @@ def matching_cascade(
             k for k in track_indices
             if tracks[k].time_since_update == 1 + level
         ]
+
         if len(track_indices_l) == 0:  # Nothing to match at this level
             continue
 
         matches_l, _, unmatched_detections = \
             min_cost_matching(
-                emb_dist_metric, emb_max_dist, kf_dist_metric, kf_max_dist, 
+                emb_dist_metric, emb_max_dist, kf_dist_metric, kf_max_dist,
                 lam, tracks, detections, track_indices_l, unmatched_detections)
         matches += matches_l
     unmatched_tracks = list(set(track_indices) - set(k for k, _ in matches))
@@ -197,8 +198,8 @@ def gate_cost_matrix(
     return cost_matrix
 
 
-def kf_cost_matrix(distance_metric, max_distance, tracks, detections, 
-	track_indices=None,detection_indices=None):
+def kf_cost_matrix(distance_metric, max_distance, tracks, detections,
+                   track_indices=None, detection_indices=None):
     """Calculate Kalman Filtering cost matrix
 
     Parameters
@@ -225,7 +226,7 @@ def kf_cost_matrix(distance_metric, max_distance, tracks, detections,
 
     Returns
     -------
-	N x M cost matrix
+        N x M cost matrix
     """
     if track_indices is None:
         track_indices = np.arange(len(tracks))

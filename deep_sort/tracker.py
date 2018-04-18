@@ -102,12 +102,12 @@ class Tracker:
                 detection_indices)
 
             return c1
-        
+
         def kf_gated_metric(tracks, dets, track_indices, detection_indices):
-            c2 = linear_assignment.kf_gate_cost_matrix(
+            c2 = linear_assignment.kf_cost_matrix(
                 iou_matching.iou_cost, self.max_iou_distance,
                 tracks, dets, track_indices, detection_indices)
-            
+
             return c2
 
         # Split track set into confirmed and unconfirmed tracks.
@@ -124,19 +124,19 @@ class Tracker:
                 self.lam, self.max_age, self.tracks, detections, confirmed_tracks)
 
         # Associate remaining tracks together with unconfirmed tracks using IOU.
-        #iou_track_candidates = unconfirmed_tracks + [
+        # iou_track_candidates = unconfirmed_tracks + [
         #    k for k in unmatched_tracks_a if
         #    self.tracks[k].time_since_update == 1]
-        #unmatched_tracks_a = [
+        # unmatched_tracks_a = [
         #    k for k in unmatched_tracks_a if
         #    self.tracks[k].time_since_update != 1]
-        #matches_b, unmatched_tracks_b, unmatched_detections = \
+        # matches_b, unmatched_tracks_b, unmatched_detections = \
         #    linear_assignment.min_cost_matching(
         #        iou_matching.iou_cost, self.max_iou_distance, self.tracks,
         #        detections, iou_track_candidates, unmatched_detections)
 
         #matches = matches_a + matches_b
-        #unmatched_tracks = list(set(unmatched_tracks_a + unmatched_tracks_b))
+        # unmatched_tracks = list(set(unmatched_tracks_a + unmatched_tracks_b)
         return matches, unmatched_tracks, unmatched_detections
 
     def _initiate_track(self, detection):

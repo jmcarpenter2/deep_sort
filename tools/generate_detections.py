@@ -1,5 +1,6 @@
 # vim: expandtab:ts=4:sw=4
 import os
+import re
 import errno
 import argparse
 import numpy as np
@@ -115,7 +116,7 @@ def create_box_encoder(model_filename, input_name="images",
     return encoder
 
 
-def generate_detections(encoder, mot_dir, output_dir, detection_dir=None):
+def generate_detections(encoder, mot_dir, output_dir, det_keyword):
     """Generate detections with features.
 
     Parameters
@@ -128,14 +129,12 @@ def generate_detections(encoder, mot_dir, output_dir, detection_dir=None):
         Path to the MOTChallenge directory (can be either train or test).
     output_dir
         Path to the output directory. Will be created if it does not exist.
-    detection_dir
-        Path to custom detections. The directory structure should be the default
-        MOTChallenge structure: `[sequence]/det/det.txt`. If None, uses the
-        standard MOTChallenge detections.
+    det_keyword
+        Keyword for path to custom detections. The directory structure should be the default
+        MOTChallenge structure: `[sequence]/det/det.txt`. If specified uses the 
+        structure `[sequence]/keyword/keyword.txt`.
 
     """
-    if detection_dir is None:
-        detection_dir = mot_dir
     try:
         os.makedirs(output_dir)
     except OSError as exception:
@@ -146,39 +145,46 @@ def generate_detections(encoder, mot_dir, output_dir, detection_dir=None):
                 "Failed to created output directory '%s'" % output_dir)
 
     for sequence in os.listdir(mot_dir):
-        print("Processing %s" % sequence)
-        sequence_dir = os.path.join(mot_dir, sequence)
+        if sequence.startswith('cam'):
+            print("Processing %s" % sequence)
+            sequence_dir = os.path.join(mot_dir, sequence)
 
-        image_dir = os.path.join(sequence_dir, "img1")
-        image_filenames = {
-            int(os.path.splitext(f)[0]): os.path.join(image_dir, f)
-            for f in os.listdir(image_dir)}
+            image_dir = os.path.join(sequence_dir, "img")
+            try:
+                image_filenames = {
+                    int(os.path.splitext(f)[0]): os.path.join(image_dir, f)
+                    for f in os.listdir(image_dir)}
+            except:
+                image_filenames = {
+                    int(re.findall('[0-9]+', f)[-1]): os.path.join(image_dir, f)
+                    for f in os.listdir(image_dir)}
 
-        detection_file = os.path.join(
-            detection_dir, sequence, "det/det.txt")
-        detections_in = np.loadtxt(detection_file, delimiter=',')
-        detections_out = []
+            detection_file = os.path.join(
+                mot_dir, sequence, "{}/{}.txt".format(det_keyword, det_keyword))
+            detections_in = np.loadtxt(detection_file, delimiter=',')
+            detections_out = []
 
-        frame_indices = detections_in[:, 0].astype(np.int)
-        min_frame_idx = frame_indices.astype(np.int).min()
-        max_frame_idx = frame_indices.astype(np.int).max()
-        for frame_idx in range(min_frame_idx, max_frame_idx + 1):
-            print("Frame %05d/%05d" % (frame_idx, max_frame_idx))
-            mask = frame_indices == frame_idx
-            rows = detections_in[mask]
+            frame_indices = detections_in[:, 0].astype(np.int)
+            min_frame_idx = frame_indices.astype(np.int).min()
+            max_frame_idx = frame_indices.astype(np.int).max()
+            for frame_idx in range(min_frame_idx, max_frame_idx + 1):
+                print("Frame %05d/%05d" % (frame_idx, max_frame_idx))
+                mask = frame_indices == frame_idx
+                rows = detections_in[mask]
 
-            if frame_idx not in image_filenames:
-                print("WARNING could not find image for frame %d" % frame_idx)
-                continue
-            bgr_image = cv2.imread(
-                image_filenames[frame_idx], cv2.IMREAD_COLOR)
-            features = encoder(bgr_image, rows[:, 2:6].copy())
-            detections_out += [np.r_[(row, feature)] for row, feature
-                               in zip(rows, features)]
+                if frame_idx not in image_filenames:
+                    print("WARNING could not find image for frame %d" %
+                          frame_idx)
+                    continue
+                bgr_image = cv2.imread(
+                    image_filenames[frame_idx], cv2.IMREAD_COLOR)
+                features = encoder(bgr_image, rows[:, 2:6].copy())
+                detections_out += [np.r_[(row, feature)] for row, feature
+                                   in zip(rows, features)]
 
-        output_filename = os.path.join(output_dir, "%s.npy" % sequence)
-        np.save(
-            output_filename, np.asarray(detections_out), allow_pickle=False)
+            output_filename = os.path.join(output_dir, "%s.npy" % sequence)
+            np.save(
+                output_filename, np.asarray(detections_out), allow_pickle=False)
 
 
 def parse_args():
@@ -193,9 +199,9 @@ def parse_args():
         "--mot_dir", help="Path to MOTChallenge directory (train or test)",
         required=True)
     parser.add_argument(
-        "--detection_dir", help="Path to custom detections. Defaults to "
+        "--detection_keyword", help="Keyword for path to custom detections. Defaults to det"
         "standard MOT detections Directory structure should be the default "
-        "MOTChallenge structure: [sequence]/det/det.txt", default=None)
+        "MOTChallenge structure: [sequence]/det/det.txt", default='det')
     parser.add_argument(
         "--output_dir", help="Output directory. Will be created if it does not"
         " exist.", default="detections")
@@ -206,7 +212,7 @@ def main():
     args = parse_args()
     encoder = create_box_encoder(args.model, batch_size=32)
     generate_detections(encoder, args.mot_dir, args.output_dir,
-                        args.detection_dir)
+                        args.detection_keyword)
 
 
 if __name__ == "__main__":

@@ -46,7 +46,7 @@ def gather_sequence_info(sequence_dir, detection_file):
         image_filenames = {
             int(os.path.splitext(f)[0]): os.path.join(image_dir, f)
             for f in os.listdir(image_dir)}
-    except:
+    except ValueError:
         image_filenames = {
             int(re.findall('[0-9]+', f)[-1]): os.path.join(image_dir, f)
             for f in os.listdir(image_dir)}
@@ -215,7 +215,7 @@ def run(sequence_dir, detection_file, output_file, min_confidence,
     f = open(output_file, 'w')
     for row in results:
         print('%d,%d,%.2f,%.2f,%.2f,%.2f,1,-1,-1,-1' % (
-            row[0], row[1], row[2], row[3], row[4], row[5]),file=f)
+            row[0], row[1], row[2], row[3], row[4], row[5]), file=f)
 
 
 def parse_args():
@@ -241,7 +241,7 @@ def parse_args():
         "box height. Detections with height smaller than this value are "
         "disregarded", default=0, type=int)
     parser.add_argument(
-        "--nms_max_overlap",  help="Non-maxima suppression threshold: Maximum "
+        "--nms_max_overlap", help="Non-maxima suppression threshold: Maximum "
         "detection overlap.", default=1.0, type=float)
     parser.add_argument(
         "--max_cosine_distance", help="Gating threshold for cosine distance "
@@ -253,8 +253,8 @@ def parse_args():
         "--display", help="Show intermediate tracking results",
         default=False, type=bool)
     parser.add_argument(
-	"--lam", help="Proportional influence of kalman filter to appearance metrics on cost matrix",
-	 default=0.0, type=float)
+        "--lam", help="Proportional influence of kalman filter to appearance metrics on cost matrix",
+        default=0.0, type=float)
     return parser.parse_args()
 
 

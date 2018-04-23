@@ -1,7 +1,9 @@
-from distutils.core import setup
+from setuptools import setup, find_packages
+
+
 setup(
   name = 'deep_sort_mcdat',
-  packages = ['deep_sort_mcdat', 'application_util', 'deep_sort', 'tools'], # this must be the same as the name above
+  packages = find_packages(), 
   version = '0.1',
   description = 'Customized deep_sort to be aligned with the paper',
   author = 'Jason Carpenter',
